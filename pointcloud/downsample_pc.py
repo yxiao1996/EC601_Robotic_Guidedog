@@ -25,7 +25,7 @@ def downsample(pc_raw, rate = 50):
 
     return downsampled_points
 
-def downsample_vector(pc_raw, rate = 50, num_pts = 10000):
+def downsample_vector(pc_raw, rate = 50, num_pts = 7000):
 
     """ 
     down sample the raw point cloud(trying to improve performance using at the expense of memory)

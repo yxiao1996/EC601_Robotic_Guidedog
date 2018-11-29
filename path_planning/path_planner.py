@@ -234,7 +234,7 @@ class path_planner(object):
 
     def draw_path(self, path, lines=False):
 
-        unit_size = 10
+        unit_size = 5
         height = len(self.map)
         width = len(self.map[0])
         t_h = unit_size * height
@@ -260,7 +260,7 @@ class path_planner(object):
                     # Draw an obstacle in world
                     pt1 = (j * unit_size + ofs, i * unit_size + ofs)
                     pt2 = ((j+1) * unit_size - ofs, (i+1) * unit_size - ofs)
-                    cv2.rectangle(world, pt1, pt2, (0, 0, 200), 3)
+                    cv2.rectangle(world, pt1, pt2, (0, 0, 200), 2)
 
         # Draw Optimal Path 
         x_ofs = int(unit_size / 2)
@@ -273,7 +273,7 @@ class path_planner(object):
             pt1 = (f_p * unit_size + x_ofs, i * unit_size + y_ofs)
             pt2 = (t_p * unit_size + x_ofs, (i+1) * unit_size + y_ofs)
 
-            world = cv2.line(world, pt1, pt2, (0, 255, 0), 5)
+            world = cv2.line(world, pt1, pt2, (0, 255, 0), 3)
 
             if i == len(path) - 2:
                 # draw target
@@ -339,14 +339,10 @@ if __name__ == "__main__":
     p.plan()
     target = p.find_default_target(0)
     if len(target) > 0:
-        # print(p.paths)
-        # print(p.values)
-        # print(p.prevs)
-        path = p.find_optimal_path(target)
-        end_time = time.time()
-        # p.draw_path(path)
+        print(p.values)
+        print(p.prevs)
+        path = p.find_optimal_path([3,4])
+        p.draw_path(path)
 
-        # cv2.waitKey(0)
-        print("Total TIme: ", end_time - start_time)
-        print("Graph TIme: ", path_graph_time - start_graph)
+        cv2.waitKey(0)
                       
