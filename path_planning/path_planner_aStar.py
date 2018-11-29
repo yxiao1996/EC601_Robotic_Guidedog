@@ -15,7 +15,10 @@
 # - in the path planner, the cost given to a 
 #	straight motion is 1 and the cost given to diagonal motions is 2
 # - if there is no path available, the planner will return []
-# - the planner also needs to return the size of the map (just width)
+# - In the graph development there is an additional cost 
+#	added to positions next to a boundary or a position near 
+#	obstacles (more costly for being directly next to it
+#	and costly for being diagonal to position)
 # - the graph generator adds additional costs if there are obstacles
 #	near the position you are calculating the cost for.
 # - If there is an obstacle directly infront of you and next to you
@@ -25,24 +28,21 @@
 #	and no obstacles blocking a path to it, it chooses that as the 
 #	location for the goal. If not, it drops to the next row.
 
-#######################################################
-#######################################################
-
-#######################################################
-################## Things to Add ######################
-#######################################################
-# - nothing left to add at the moment
-
-
 
 #######################################################
 #######################################################
+
+# - Measure time for generate graph function and all functions
+# - see which ones are taking the longest for various cases
+# - then try to implement a better solution
 
 
 #Import Libraries
 import cv2
 import numpy as np
 m_v = float("inf")
+import time
+import copy
 
 #######################################################
 ############ Define Path Planner Class ################
@@ -152,27 +152,36 @@ class path_planner(object):
 	# This method get's all of the neighbors that are directly next to a given query location
 	# i.e. if the query is (i,j) then it would return (i, j-1), (i-1, j,), (i, j+1)	
 	def get_next_2_you_neighbors(self, row_val, NQuery_j):
-		next2you = [[row_val, NQuery_j-1], [row_val+1, NQuery_j], [row_val, NQuery_j+1]]
 		count_next2you_obstacles = 0
-		for a_point in range(len(next2you)):
-			# First check if you're within the boundary
-			if (next2you[a_point][0] >= 0 and next2you[a_point][1] >= 0 and
-				next2you[a_point][0] <= self.height-1 and next2you[a_point][1] <= self.width-1):
-				if self.map[next2you[a_point][0]][next2you[a_point][1]] == 1:
+
+		if (row_val >= 0 and NQuery_j-1 >= 0 and
+				row_val <= self.height-1 and NQuery_j-1 <= self.width-1):
+				if self.map[row_val][NQuery_j-1] == 1:
+					count_next2you_obstacles+=1
+		elif (row_val >= 0 and NQuery_j+1 >= 0 and
+				row_val <= self.height-1 and NQuery_j+1 <= self.width-1):
+				if self.map[row_val][NQuery_j+1] == 1:
+					count_next2you_obstacles+=1
+		elif (row_val+1 >= 0 and NQuery_j >= 0 and
+				row_val+1 <= self.height-1 and NQuery_j <= self.width-1):
+				if self.map[row_val+1][NQuery_j] == 1:
 					count_next2you_obstacles+=1
 		return count_next2you_obstacles
 
 	# This method get's all of the neighbors that are diagonal to a given query location
 	# i.e. if the query is (i,j) then it would return (i-1, j+1) and (i-1, j-1)	
 	def get_diag_2_you(self, row_val, NQuery_j):
-		diag2you = [[row_val+1, NQuery_j-1], [row_val+1, NQuery_j+1]]
 		count_diag2you_obstacles = 0
-		for a_point in range(len(diag2you)):
-			# Verify the point is on the map!
-			if (diag2you[a_point][0] >= 0 and diag2you[a_point][1] >= 0 and
-				diag2you[a_point][0] <= self.height-1 and diag2you[a_point][1] <= self.width-1):
-				if self.map[diag2you[a_point][0]][diag2you[a_point][1]] == 1:
-					count_diag2you_obstacles+=1
+
+		if (row_val+1 >= 0 and NQuery_j-1 >= 0 and
+			row_val+1 <= self.height-1 and NQuery_j-1 <= self.width-1):
+			if self.map[row_val+1][NQuery_j-1] == 1:
+				count_diag2you_obstacles+=1
+		if (row_val+1 >= 0 and NQuery_j+1 >= 0 and
+			row_val+1 <= self.height-1 and NQuery_j+1 <= self.width-1):
+			if self.map[row_val+1][NQuery_j+1] == 1:
+				count_diag2you_obstacles+=1
+
 		return count_diag2you_obstacles
 
 	def get_diag_and_next(self, row_val, NQuery_i, diff):
@@ -198,7 +207,69 @@ class path_planner(object):
 		# if either of the first step positions (first row), center, center-1, or center+1 
 		# is an obstacle then set that position on the graph to be m_v. If there are no 
 		# obstacles then set the first row to be 2 1 2 centered at center
+		#Initialize the three steps surround center in the first row to be 2, 1, 2 + obstacle cost
 
+		if self.map[0][self.center-1] != 1:
+			next2you_obstacles = self.get_next_2_you_neighbors(0, self.center-1)
+			diag2you_obstacles = self.get_diag_2_you(0, self.center-1)
+			# Add boundary cost
+			boundary_cost = 0
+			if self.center-1 == 0 or self.center-1 == self.width-1:
+				boundary_cost = 50
+			self.graph[0][self.center][self.center-1] = next2you_obstacles*25 + diag2you_obstacles*15 + boundary_cost + 2
+		elif self.map[0][self.center+1] != 1:
+			next2you_obstacles = self.get_next_2_you_neighbors(0, self.center+1)
+			diag2you_obstacles = self.get_diag_2_you(0, self.center+1)
+			# Add boundary cost
+			boundary_cost = 0
+			if self.center+1 == 0 or self.center+1 == self.width-1:
+				boundary_cost = 50
+			self.graph[0][self.center][self.center+1] = next2you_obstacles*25 + diag2you_obstacles*15 + boundary_cost + 2
+		elif self.map[0][self.center] != 1:
+			next2you_obstacles = self.get_next_2_you_neighbors(0, self.center)
+			diag2you_obstacles = self.get_diag_2_you(0, self.center)
+			# Add boundary cost
+			boundary_cost = 0
+			if self.center == 0 or self.center == self.width-1:
+				boundary_cost = 50
+			self.graph[0][self.center][self.center] = next2you_obstacles*25 + diag2you_obstacles*15 + boundary_cost + 1
+
+		
+		for a_row in range(self.height-1):
+			new_layer = []
+			[new_layer.append([m_v]*self.width) for x in range(0,self.width)]
+			for curr_col in range(self.width):
+				if self.map[a_row][curr_col]==1:
+					continue
+				else:
+					for next_col in range(self.width):
+						diff = curr_col - next_col
+						if self.map[a_row+1][next_col]==1 or abs(diff) >1:
+							continue
+						else:
+							# Calculate Move Cost (weed out other costs so it's only diag or in front)
+							if diff == 0:
+								move_cost = 1
+							else:
+								move_cost = 2
+							# Now calculate Nearby Obstacle Costs
+							# Add extra costs if you are near an obstacle. 15 if the point has
+							# diagonal with obstacle, and 25 if the obstacle is next to you.
+							next2you_obstacles = self.get_next_2_you_neighbors(a_row+1, next_col)
+							diag2you_obstacles = self.get_diag_2_you(a_row+1, next_col)							
+							if next_col == 0 or next_col == self.width-1:
+								boundary_cost = 50
+							else:
+								boundary_cost = 0
+							total_cost = next2you_obstacles*25 + diag2you_obstacles*15 + boundary_cost + move_cost
+							new_layer[curr_col][next_col] = total_cost
+			self.graph.append(new_layer)
+		return self.graph
+
+	
+	def gen_graph2(self):
+		paths = []
+		
 		#Initialize the three steps surround center in the first row to be 2, 1, 2 + obstacle cost
 		first_row = [-1 ,0, 1]
 		for a_point in first_row:
@@ -216,43 +287,54 @@ class path_planner(object):
 				cost = 1
 			self.graph[0][self.center][self.center+a_point] = cost + obstacles_cost
 
-		
-		# For every additional pair of rows in the map (loop height - 1) create the graph
-		# for the given pair of rows. Then append this to the start of the graph!
-		for i_row in range(self.height-1):
-			new_layer = []
-			[new_layer.append([m_v]*self.width) for x in range(0,self.width)]
-			for i_col in range(self.width):
-				for j_col in range(self.width):
-					if self.map[i_row+1][j_col] == 1: #is this location on the map an obstacle?
-						new_layer[i_col][j_col] = m_v
-					else:
-						diff = j_col-i_col
-						# Add extra costs if you are near an obstacle. 15 if the point has
-						# diagonal with obstacle, and 25 if the obstacle is next to you.
-						next2you_obstacles = self.get_next_2_you_neighbors(i_row+1, j_col)
-						diag2you_obstacles = self.get_diag_2_you(i_row+1, j_col)
-						# Add boundary cost as well
-						boundary_cost = 0
-						if j_col == 0 or j_col == self.width-1:
-							boundary_cost = 50
-						obstacles_cost = next2you_obstacles*25 + diag2you_obstacles*15 + boundary_cost
-						if abs(diff) == 0:
-							# Need to get the number of diag's that are obstacles
-							# and the number of next2you's that are obstacles
-							new_layer[i_col][j_col] = 1 + obstacles_cost 
-						elif abs(diff) == 1:
-							# add a check here if the position directly underneath the diagonal
-							# and right next to the diagonal (same row) then set 
-							if self.get_diag_and_next(i_row, i_col, diff): #is this location on the map an obstacle?
-							 	new_layer[i_col][j_col] = m_v
-							else:
-								new_layer[i_col][j_col] = 2 + obstacles_cost
-						else:
-							new_layer[i_col][j_col] = m_v
-			self.graph.append(new_layer)
-		return self.graph
+		height = len(self.map)
+		width = len(self.map[0])
+		first_row = [-1 ,0, 1]
 
+		for i in range(height - 1):
+			# generate the matrxi from ith row to i+1throw
+			cur_row = self.map[i]
+			nxt_row = self.map[i+1]
+			trans_mat = []
+			for j in range(len(cur_row)):
+				# generate path weights for each of nodes in this layer
+				if (cur_row[j] == 1):
+					trans = [m_v] * width
+				else:
+					trans = [0] * width
+					for k in range(len(nxt_row)):
+						# generate path weight to each of nodes in the next layer
+						if nxt_row[k] == 1:
+							trans[k] = m_v
+						else:
+							if k == j:
+								trans[k] = 1
+							elif (abs(k - j) == 1 and (cur_row[k] == 0 or nxt_row[j] == 0)):
+								trans[k] = 20
+							else:
+								trans[k] = m_v
+							# add obstacle avoiding weights
+							if (k < width -1):
+								if (nxt_row[k+1] == 1):
+									trans[k] += 15
+							if (k > 0):
+								if (nxt_row[k-1] == 1):
+									trans[k] += 15
+							if (i == height - 2): # check last row
+								continue
+							fur_row = self.map[i+2]
+							if (fur_row[k] == 1):
+								trans[k] += 50
+							if (k < width -1):
+								if (fur_row[k+1] == 1):
+									trans[k] += 15
+							if (k > 0):
+								if (fur_row[k-1] == 1):
+									trans[k] += 15
+				trans_mat.append(trans.copy())
+			self.graph.append(trans_mat)
+		# self.graph = paths
+		return self.graph
 
 	# This function picks the minimum cost index in the first row as the starting position on the map.
 	def pick_start_pos(self):
@@ -260,16 +342,20 @@ class path_planner(object):
 		# then get the min value and index for it.
 		# the first row of the graph
 		graph_vals = self.graph[0][self.center]
+		# print(graph_vals)
 		total_cost = []
 		for a_pos in range(len(graph_vals)):
 			if graph_vals[a_pos] != m_v:
 				total_cost = total_cost + [graph_vals[a_pos]+self.heuristics[0][a_pos]]
+			else:
+				total_cost = total_cost + [m_v]
 		# If the first row is all obstacles then pass back an empty start list, which
 		# should tell the path_planner that there is no start
 		if (self.map[0][self.center]==1) and (self.map[0][self.center-1]==1) and (self.map[0][self.center+1]==1):
 			starting_location = []
 		else:
 			starting_location = [total_cost.index(min(total_cost))]
+			# print("Starting: ", starting_location)
 		return starting_location
 
 	# this function moves through the backpointers of the map and creates a path
@@ -288,10 +374,13 @@ class path_planner(object):
 			return []
 
 	def priority_queue(self):
-		idxNbest=min(self.openset.items(), key=lambda x: x[1])[0]
-		self.openset.pop(idxNbest, None)
-		self.closedset.append(idxNbest)
-		return idxNbest
+		if len(self.openset) == 0:
+			return []
+		else:
+			idxNbest=min(self.openset.items(), key=lambda x: x[1])[0]
+			self.openset.pop(idxNbest, None)
+			self.closedset.append(idxNbest)
+			return idxNbest
 
 
 	def path_search(self, starting_location):
@@ -333,11 +422,14 @@ class path_planner(object):
 				while row == self.height:
 					# print(idxNbest)
 					idxNbest=self.priority_queue()
-					# Update the row
-					row = idxNbest[0] + 1
-					# If you're at the goal location then run through the backpointers
-					if idxNbest == (self.goal[0], self.goal[1]):
-						return self.get_path_from_backpointers(starting_location, all_cost_backpointers)
+					if len(idxNbest) == 0:
+						return []
+					else:
+						# Update the row
+						row = idxNbest[0] + 1
+						# If you're at the goal location then run through the backpointers
+						if idxNbest == (self.goal[0], self.goal[1]):
+							return self.get_path_from_backpointers(starting_location, all_cost_backpointers)
 
 
 				# Get the neighbors of idxNbest
@@ -377,24 +469,26 @@ class path_planner(object):
 			return self.get_path_from_backpointers(starting_location, all_cost_backpointers)
 
 
-	def draw_path(self, path):
+	def draw_path(self, path, lines=False):
 
-		unit_size = 60
+		unit_size = 10
+		# set the unit size to 10 for faster implementation
 		height = len(self.map)
 		width = len(self.map[0])
 		t_h = unit_size * height
 		t_w = unit_size * width
 		world = np.array([[[240] * 3] * (t_w)] * (t_h)).astype(np.uint8)
 
-		for x in range(0, t_w, unit_size):
-			pt1 = (x, 0)
-			pt2 = (x, t_h)
-			world = cv2.line(world, pt1, pt2, (255, 0, 0))
-        
-		for y in range(0, t_h, unit_size):
-			pt1 = (0, y)
-			pt2 = (t_w, y)
-			world = cv2.line(world, pt1, pt2, (255, 0, 0))
+		if lines:
+			for x in range(0, t_w, unit_size):
+				pt1 = (x, 0)
+				pt2 = (x, t_h)
+				world = cv2.line(world, pt1, pt2, (255, 0, 0))
+			
+			for y in range(0, t_h, unit_size):
+				pt1 = (0, y)
+				pt2 = (t_w, y)
+				world = cv2.line(world, pt1, pt2, (255, 0, 0))
 
         # Draw Obstacles
 		ofs = int(unit_size / 5)
@@ -404,7 +498,7 @@ class path_planner(object):
 					# Draw an obstacle in world
 					pt1 = (j * unit_size + ofs, i * unit_size + ofs)
 					pt2 = ((j+1) * unit_size - ofs, (i+1) * unit_size - ofs)
-					cv2.rectangle(world, pt1, pt2, (0, 0, 255), 5)
+					cv2.rectangle(world, pt1, pt2, (0, 0, 255), 3)
 
 		# Draw Optimal Path 
 		x_ofs = int(unit_size / 2)
@@ -439,6 +533,20 @@ if __name__ == "__main__":
 	        [0, 0, 1],
 	        [1, 1, 1]
 	    ]
+	default_map2 = [
+			[0, 0, 1],
+			[0, 0, 0],
+			[1, 0, 0],
+			[0, 1, 0],
+			[0, 0, 0],
+			[0, 0, 0],
+			[1, 0, 0],
+			[1, 0, 0],
+			[0, 0, 0],
+			[0, 0, 1],
+			[0, 1, 1],
+			[0, 1, 1]
+		]
 
 	small_map = [
 	        [0, 0, 0],
@@ -451,10 +559,10 @@ if __name__ == "__main__":
 	    [1, 0, 0, 0, 0],
 	    [0, 0, 1, 1, 1],
 	    [1, 0, 0, 1, 1],
-	    [0, 1, 1, 0, 0]]
+	    [0, 0, 1, 0, 0]]
 
 	big_blocked_map = [
-	    [1, 1, 1, 1, 1],
+	    [0, 0, 0, 0, 0],
 	    [1, 1, 1, 1, 1],
 	    [1, 1, 1, 1, 1],
 	    [1, 1, 1, 1, 1],
@@ -471,27 +579,64 @@ if __name__ == "__main__":
 	        [1, 1, 0]
 	    ]
 
+	debug_map = [
+		[0., 0., 0., 0., 0., 0., 0., 0., 0.],
+		[0., 0., 0., 1., 0., 0., 0., 0., 0.],
+		[0., 0., 1., 1., 0., 0., 0., 0., 0.],
+		[0., 0., 1., 0., 0., 0., 1., 0., 0.],
+		[0., 1., 1., 0., 0., 1., 1., 0., 0.],
+		[0., 1., 1., 0., 0., 1., 0., 0., 0.],
+		[0., 1., 1., 0., 0., 0., 0., 0., 0.],
+		[0., 0., 0., 0., 1., 0., 0., 0., 0.],
+		[0., 0., 0., 0., 0., 0., 0., 0., 0.],
+		[0., 0., 0., 0., 0., 0., 0., 0., 0.],
+		[0., 0., 0., 0., 0., 0., 0., 0., 0.],
+		[0., 0., 0., 0., 0., 0., 0., 0., 0.]
+		]
 
+	start_time = time.time()
 	# Test the Class
 	goal = []
-	goal = [4,4]	
+	# goal = [6,1]	
 	p = path_planner(big_map, goal)
 	if len(p.goal)==0:
 		path = []
 	else:
-		h = p.gen_heuristics(2)
+		h = p.gen_heuristics(1)
+		heuristics_time = time.time()
 		# print("Heuristics:")
 		# for j in range(len(h)):
 		# 	print(h[j])
+		
+		start_graph = time.time()
 		t = p.gen_graph()
-		# print("Graph:")
+		graph_time = time.time()
+
+		# print("Graph :")
 		# for i in range(len(p.graph)):
 		# 	print(p.graph[i])
+		# time_for_graph = graph_time - start_graph
+		# print("Graph: ", time_for_graph)
+
 		startpos = p.pick_start_pos()
-		# print(startpos)
+		pick_start_time = time.time()
 		path = p.path_search(startpos)
+		path_search_time = time.time()
+	end_time = time.time()
 	print(path)
-	p.draw_path(path)
-	cv2.waitKey(0)
+	# p.draw_path(path)
+	# cv2.waitKey(0)
+
+	Total_time = end_time - start_time
+	time_for_heuristics = heuristics_time - start_time
+	time_for_graph = graph_time - start_graph
+	time_for_start_pos = pick_start_time - graph_time
+	time_for_search  = path_search_time - pick_start_time
+
+	print("Total Time: ", Total_time)
+	# print("Heuristics: ", time_for_heuristics)
+	print("Graph: ", time_for_graph)
+	# print("Start Pos: ", time_for_start_pos)
+	# print("Search: ", time_for_search)
 
 
