@@ -52,6 +52,12 @@ Currently, the team is testing different means of communication between the devi
 
 https://drive.google.com/file/d/1b3FGtx0sY1LxHujLU3Z5INn5FbynNigf/view?usp=sharing
 
+(12/14/2018) to do list for future pushes:
+
+1. move everything into ROS
+2. object tracking
+3. use a mobile robot for better user experience and mapping
+
 ## Get Started
 
 ### Reference Repos: 
@@ -61,7 +67,7 @@ https://drive.google.com/file/d/1b3FGtx0sY1LxHujLU3Z5INn5FbynNigf/view?usp=shari
 1. General setup:
     
     The main part of this repo is build and test on **Windows** 10 with **Anaconda3**. On other platforms such as MAC and Linix, code should also work without significant modification.
-2. For testing decision algorithm:
+2. For using deep learning object detection module:
 
     * OpenCV (Build and test with version 3.4.3)
     * TensorFlow (Using Version 1.10.0)
@@ -70,36 +76,40 @@ https://drive.google.com/file/d/1b3FGtx0sY1LxHujLU3Z5INn5FbynNigf/view?usp=shari
 
     * OpenCV
     * librealsense (Intel RealSense camera driver, build and test with python wrapper called pyrealsense2. Only needed when you want to read from .bag file)
+    * There are 2 parts in our camera driver: 1) librealsense (official camera driver from intel); 2) realsense2_camera(a ROS wrapper for using camera driver in ROS). Following instructions is based on Ubuntu 16.04. 
+    * Follow this page to install official realsense driver on you Ubuntu machine: https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md
+    * Follow this page to install ROS wrapper for librealsense on your Ubuntu machine:
+    https://github.com/intel-ros/realsense
 4. For using path planning:
    
     * OpenCV (Only used for drawing planning result) 
 5. For voice interface
 
-    * use sox to play audio
+    * pip install playsound    
 
-6. RealSense camera driver(Ubuntu, ROS)
-
-    * There are 2 parts in our camera driver: 1) librealsense (official camera driver from intel); 2) realsense2_camera(a ROS wrapper for using camera driver in ROS). Following instructions is based on Ubuntu 16.04. 
-    * Follow this page to install official realsense driver on you Ubuntu machine: https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md
-    * Follow this page to install ROS wrapper for librealsense on your Ubuntu machine:
-    https://github.com/intel-ros/realsense
-
-7. Visual Odometry from rtabmap_ros
+6. Visual Odometry from rtabmap_ros
 
     * we are testing with rgbd-odometry node from rtabmap_ros package from ROS community. You can install rtabmap_ros package using the following instruction:
     https://github.com/introlab/rtabmap_ros
 
-8. Audio output
+7. Audio output
    
    * use playsound to output audio. can be installed by command:
-   ```
+   
    pip(3) install playsound
-    ```
 
-    pip3 install paho-mqtt
+8. Point Cloud based mapping algorithm
+
     pip3 install open3d-python
     pip3 install scikit-fuzzy
     pip3 install scikit-learn
+
+9. monitor module
+
+    pip3 install paho-mqtt
+
+10. gui interface
+    
     pip3 install pyqt5
 
 ## How things work and Examples
